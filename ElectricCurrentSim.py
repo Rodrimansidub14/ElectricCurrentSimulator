@@ -1,15 +1,22 @@
 import pygame
 import sys
 from Logica import calculate_resistance, calculate_current, calculate_power, drift_velocity, electron_travel_time 
-
+import random
+import math
 # Initialize pygame
 pygame.init()
-
+error_message = ""
 # Window Configuration
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Electrical Conduction Simulation")
-
+MATERIALS = {
+    "Gold": {"resistivity": 2.44e-8, "particle_density": 5.9e28},
+    "Silver": {"resistivity": 1.59e-8, "particle_density": 5.86e28},
+    "Copper": {"resistivity": 1.68e-8, "particle_density": 8.5e28},
+    "Aluminum": {"resistivity": 2.82e-8, "particle_density": 6.02e28},
+    "Graphite": {"resistivity": 7.837e-5, "particle_density": 2.2e23}
+}
 btn_rect = pygame.Rect(WIDTH // 2 - 100, 300, 200, 50)
 # Colors
 WHITE = (255, 255, 255)
@@ -18,14 +25,16 @@ BLUE = (0, 0, 255)
 LIGHT_GRAY = (200, 200, 200)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
+PINK = (255, 0, 255)
+LIGHT_BLUE = (255, 255, 255)
 
 # Font
 font = pygame.font.Font(None, 28)
 # Cylinder representation
-CYLINDER_RECT = pygame.Rect(WIDTH // 4, HEIGHT - 150, WIDTH // 2, 100)
+CYLINDER_RECT = pygame.Rect(WIDTH // 4, HEIGHT - 345, WIDTH // 2, 100)
 
 # Random walk option
-random_walk_option = {"rect": pygame.Rect(WIDTH // 4, HEIGHT - 200, 20, 20), "checked": False, "label": "Show Random Walk"}
+random_walk_option = {"rect": pygame.Rect(WIDTH // 4, HEIGHT - 85, 20, 20), "checked": False, "label": "Show Random Walk"}
 # AWG to mm conversion (assuming some values for simplicity)
 def awg_to_mm(awg):
     if awg == "0000":
@@ -73,33 +82,6 @@ def draw_awg_conversion():
             conversion_text = f"Conversion ({awg_value}): {mm_value} mm"
             conversion_surface = font.render(conversion_text, True, BLACK)
             screen.blit(conversion_surface, (WIDTH // 2 - conversion_surface.get_width() // 2, 280))
-
-def start_simulation():
-    simulation_running = True
-    while simulation_running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                simulation_running = False
-                pygame.quit()
-                sys.exit()
-
-            # Check for random walk checkbox click
-            if event.type == pygame.MOUSEBUTTONDOWN and random_walk_option["rect"].collidepoint(event.pos):
-                random_walk_option["checked"] = not random_walk_option["checked"]
-
-        # Aquí irá la lógica de la simulación y la visualización de los electrones
-
-        # Dibuja la casilla de verificación de caminata aleatoria en la pantalla de simulación
-        screen.fill(WHITE)  # Limpia la pantalla
-        pygame.draw.rect(screen, BLACK, random_walk_option["rect"], 2)
-        if random_walk_option["checked"]:
-            pygame.draw.line(screen, BLACK, random_walk_option["rect"].topleft, random_walk_option["rect"].bottomright, 2)
-            pygame.draw.line(screen, BLACK, random_walk_option["rect"].bottomleft, random_walk_option["rect"].topright, 2)
-        label_surface = font.render("Show Random Walk", True, BLACK)
-        screen.blit(label_surface, (random_walk_option["rect"].x + 30, random_walk_option["rect"].y))
-
-        pygame.display.flip()
-
 def draw_ui():
     screen.fill(WHITE)
     
@@ -157,6 +139,334 @@ def draw_ui():
     btn_surface = font.render("Start Simulation", True, WHITE)
     screen.blit(btn_surface, (btn_rect.x + 10, btn_rect.y + 10))
 
+    if error_message:
+        error_surface = font.render(error_message, True, RED)
+        screen.blit(error_surface, (WIDTH // 2 - error_surface.get_width() // 2, 400))
+# Constantes
+ELECTRON_RADIUS = 0.05
+NUM_ELECTRONS = 100
+NUM_COLUMNS = 10
+COLUMN_SPACING = CYLINDER_RECT.width // (NUM_COLUMNS + 1)
+class Atom:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.radius = 5  # Radio del átomo
+
+    def draw(self, screen):
+        pygame.draw.circle(screen, LIGHT_BLUE, (self.x, self.y), self.radius)
+class Electron:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.radius = 2 # Radio del círculo que representa al electrón
+        self.color = BLUE
+        self.speed = 0.2  # Puedes ajustar la velocidad según lo necesites
+
+    def move(self):
+        self.x += self.speed
+
+    def draw(self, screen):
+        pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
+    def move_towards(self, target_x, target_y):
+        # Calcula la dirección hacia el objetivo
+        dx = target_x - self.x
+        dy = target_y - self.y
+        dist = math.sqrt(dx**2 + dy**2)
+        if dist > 0:
+            dx /= dist
+            dy /= dist
+        # Mueve el electrón una pequeña distancia en esa dirección
+        self.x += dx * 2  # 2 es una velocidad arbitraria
+        self.y += dy * 2
+
+    def distance_to(self, target_x, target_y):
+        return math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
+    
+
+    
+        
+random_walk_active = False
+def start_simulation():
+    global error_message
+     
+    try:
+        length = float(input_boxes["length"]["text"])
+        diameter_unit = dropdowns["diameter_unit"]["selected"]
+        if diameter_unit == "AWG":
+            awg_value = input_boxes["awg"]["text"]
+            diameter = awg_to_mm(awg_value)
+        else:
+            diameter = float(input_boxes["diameter_mm"]["text"])
+        material = dropdowns["material"]["selected"]
+        voltage = float(input_boxes["voltage"]["text"])
+
+        if not (length and diameter and material and voltage):
+            error_message = "Por favor, ingrese todos los valores necesarios."
+            return
+
+    except ValueError:
+        error_message = "Por favor, ingrese valores válidos."
+    except ZeroDivisionError:
+        error_message = "Error: División por cero."
+    except Exception as e:
+        error_message = f"Error: {str(e)}"
+
+    if error_message:
+        print(error_message)
+
+    simulation_running = True
+    length = float(input_boxes["length"]["text"])
+    diameter_unit = dropdowns["diameter_unit"]["selected"]
+    if diameter_unit == "AWG":
+        awg_value = input_boxes["awg"]["text"]
+        special_awgs = ["0000", "000", "00"]
+        if awg_value.isdigit() and 0 <= int(awg_value) <= 40 or awg_value in special_awgs:
+            diameter = awg_to_mm(awg_value)
+        else:
+            print("Invalid AWG value.")
+            return
+    else:
+        diameter = float(input_boxes["diameter_mm"]["text"])
+    material = dropdowns["material"]["selected"]
+
+    if not diameter or not material:
+        
+        error_message = "Por favor, ingrese todos los valores necesarios."
+        return
+
+    # Convertir los valores de cadena a flotante (si es necesario)
+    length = float(length)
+    diameter = float(diameter)
+
+    exit_button = pygame.Rect(WIDTH - 100, 10, 80, 30)
+
+    # Definir el número de columnas y el espacio entre columnas
+    NUM_COLUMNS = 10
+    COLUMN_SPACING = CYLINDER_RECT.width // (NUM_COLUMNS )
+    ELECTRON_SPACING = 10  # Espacio vertical entre electrones
+
+    # Crear electrones en múltiples columnas
+    electrons = []
+    for i in range(NUM_COLUMNS):
+        column_x = CYLINDER_RECT.left + (i + 1) * COLUMN_SPACING
+        for j in range(NUM_ELECTRONS // NUM_COLUMNS):
+            electron_y = CYLINDER_RECT.top + j * ELECTRON_SPACING + ELECTRON_SPACING // 2
+            electrons.append(Electron(column_x, electron_y))
+    # Crear átomos
+    atoms = []
+    for i in range(0, CYLINDER_RECT.width, 20):  # Espaciado horizontal de 20 píxeles
+        for j in range(0, CYLINDER_RECT.height, 20):  # Espaciado vertical de 20 píxeles
+            atoms.append(Atom(CYLINDER_RECT.left + i, CYLINDER_RECT.top + j))
+
+
+    while simulation_running:
+        screen.fill(WHITE)  # Limpia la pantalla al comienzo de cada iteración
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                simulation_running = False
+                return
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if exit_button.collidepoint(event.pos):
+                    simulation_running = False
+                    return
+                # Mueve esta lógica dentro del bucle de eventos
+                if random_walk_option["rect"].collidepoint(event.pos):
+                    random_walk_option["checked"] = not random_walk_option["checked"]
+
+        if random_walk_option["checked"]:
+            random_walk_simulation()
+
+        
+        
+        # Aquí irá la lógica de la simulación y la visualización de los electrones
+
+        # Dibuja el cilindro
+        pygame.draw.rect(screen, LIGHT_GRAY, CYLINDER_RECT)
+        cylinder_label_surface = font.render("Conductor", True, BLACK)
+        screen.blit(cylinder_label_surface, (CYLINDER_RECT.centerx - cylinder_label_surface.get_width() // 2, CYLINDER_RECT.top - 60))
+
+        # Dibuja la diferencia de potencial debajo del cilindro
+        pygame.draw.circle(screen, BLUE, (CYLINDER_RECT.left+180, CYLINDER_RECT.bottom + 50), 20)
+        pygame.draw.circle(screen, RED, (CYLINDER_RECT.right-180, CYLINDER_RECT.bottom + 50), 20)
+        plus_surface = font.render("-", True, WHITE)
+        minus_surface = font.render("+", True, WHITE)
+        screen.blit(plus_surface, (CYLINDER_RECT.left+177, CYLINDER_RECT.bottom + 40))
+        screen.blit(minus_surface, (CYLINDER_RECT.right-185, CYLINDER_RECT.bottom + 40))
+
+        # Coordenadas de inicio y fin para el cable positivo (rojo)
+        start_pos_red = (CYLINDER_RECT.left, CYLINDER_RECT.bottom)
+        end_pos_red = (CYLINDER_RECT.left, CYLINDER_RECT.bottom + 50)
+        start_pos_red2 = (CYLINDER_RECT.left, CYLINDER_RECT.bottom+50)
+        end_pos_red2 = (CYLINDER_RECT.left+160, CYLINDER_RECT.bottom + 50)
+        # Coordenadas de inicio y fin para el cable negativo (azul)
+        start_pos_blue = (CYLINDER_RECT.right, CYLINDER_RECT.bottom)
+        end_pos_blue = (CYLINDER_RECT.right , CYLINDER_RECT.bottom + 50)
+        start_pos_blue2 = (CYLINDER_RECT.right, CYLINDER_RECT.bottom+50)
+        end_pos_blue2 = (CYLINDER_RECT.right-160 , CYLINDER_RECT.bottom + 50)
+        # Dibuja los cables
+        pygame.draw.line(screen, BLACK, start_pos_red, end_pos_red, 3)  # Cable positivo (rojo)
+        pygame.draw.line(screen, BLACK, start_pos_red2, end_pos_red2, 3)
+        pygame.draw.line(screen, BLACK, start_pos_blue, end_pos_blue, 3)  # Cable negativo (azul)
+        pygame.draw.line(screen, BLACK, start_pos_blue2, end_pos_blue2, 3)  
+        # Coordenadas para la flecha de corriente
+       # Coordenadas para la flecha de corriente
+        # Coordenadas para la flecha de corriente
+       # Coordenadas para la flecha de corriente
+        start_arrow = (CYLINDER_RECT.left, CYLINDER_RECT.top - 20)  # 40 píxeles arriba del cilindro
+        end_arrow = (CYLINDER_RECT.right, CYLINDER_RECT.top - 20)
+
+        # Dibuja el cuerpo de la flecha
+        pygame.draw.line(screen, PINK, start_arrow, end_arrow, 3)
+
+        # Dibuja la punta de la flecha (triángulo) en el extremo izquierdo
+        pygame.draw.polygon(screen, PINK, [(start_arrow[0], start_arrow[1]), 
+                                            (start_arrow[0] + 10, start_arrow[1] - 10), 
+                                            (start_arrow[0] + 10, start_arrow[1] + 10)])
+
+        # Renderiza y dibuja la letra "I" encima de la flecha
+        current_label = font.render("I", True, PINK)
+        screen.blit(current_label, (CYLINDER_RECT.centerx - current_label.get_width() // 2, start_arrow[1] - 21)) 
+       
+        # Coordenadas para la flecha de diferencia de potencial
+        
+        start_vd_arrow = (CYLINDER_RECT.right-50, CYLINDER_RECT.bottom + 25)  # 20 píxeles debajo del cilindro
+        end_vd_arrow = (CYLINDER_RECT.left+50, CYLINDER_RECT.bottom + 25)
+
+        # Dibuja el cuerpo de la flecha
+        pygame.draw.line(screen, GREEN, start_vd_arrow, end_vd_arrow, 3)
+
+        # Dibuja la punta de la flecha (triángulo) en el extremo derecho
+        pygame.draw.polygon(screen, GREEN, [(start_vd_arrow[0], start_vd_arrow[1]), 
+                                            (start_vd_arrow[0] - 10, start_vd_arrow[1] - 10), 
+                                            (start_vd_arrow[0] - 10, start_vd_arrow[1] + 10)])
+
+        # Renderiza y dibuja la etiqueta "V_d" encima de la flecha
+        main_text = "V"
+        sub_text = "d"
+
+        # Renderiza el texto principal
+        main_surface = font.render(main_text, True, GREEN)
+
+        # Ajusta el tamaño de la fuente y la posición vertical para el subíndice
+        sub_font = pygame.font.Font(None, 20)  # Ajusta el tamaño de la fuente según tus preferencias
+        sub_surface = sub_font.render(sub_text, True, GREEN)
+
+        # Calcula la posición total
+        total_width = main_surface.get_width() + sub_surface.get_width()
+        x_position = CYLINDER_RECT.centerx - total_width // 2
+        y_position = start_vd_arrow[1] - 20  # Centra la etiqueta "V_d" sobre la flecha
+
+        # Dibuja el texto principal y el subíndice en la pantalla
+        screen.blit(main_surface, (x_position, y_position))
+        screen.blit(sub_surface, (x_position + main_surface.get_width(), y_position + main_surface.get_height() - sub_surface.get_height()))
+
+
+         # Calcular la resistencia, corriente, potencia, velocidad de arrastre y tiempo de viaje del electrón
+        resistance = calculate_resistance(length, diameter, material)
+
+        voltage = float(input_boxes["voltage"]["text"])  # Asegúrate de que el usuario haya ingresado un voltaje
+        current = calculate_current(voltage, resistance)
+        power = calculate_power(voltage, current)
+        area = 3.141592653589793 * (diameter / 2)**2
+        drift_v = drift_velocity(current, area, MATERIALS[material]["particle_density"])
+        travel_time = electron_travel_time(length, drift_v)
+        # Mostrar los resultados en la pantalla de simulación
+        resistance_text = f"Resistencia: {resistance:.2e} ohms"
+        current_text = f"Corriente: {current:.2e} A"
+        power_text = f"Potencia: {power:.2e} W"
+        drift_v_text = f"Velocidad de arrastre: {drift_v:.2e} m/s"
+        travel_time_text = f"Tiempo de viaje del electrón: {travel_time:.2e} s"
+         # Verificar que los valores ingresados son válidos
+      
+        # Dibujar los textos en la pantalla
+        screen.blit(font.render(resistance_text, True, BLACK), (50, 50))
+        screen.blit(font.render(current_text, True, BLACK), (50, 80))
+        screen.blit(font.render(power_text, True, BLACK), (50, 110))
+        screen.blit(font.render(drift_v_text, True, BLACK), (50, 140))
+        screen.blit(font.render(travel_time_text, True, BLACK), (50, 170))
+        for electron in electrons:
+                    electron.move()
+                    # Si el electrón llega al final del cilindro, reinícialo en el lado izquierdo
+                    if electron.x > CYLINDER_RECT.right:
+                        electron.x = CYLINDER_RECT.left
+                    electron.draw(screen)
+        # Dibuja la casilla de verificación de caminata aleatoria
+        pygame.draw.rect(screen, BLACK, random_walk_option["rect"], 2)
+        if random_walk_option["checked"]:
+            pygame.draw.line(screen, BLACK, random_walk_option["rect"].topleft, random_walk_option["rect"].bottomright, 2)
+            pygame.draw.line(screen, BLACK, random_walk_option["rect"].bottomleft, random_walk_option["rect"].topright, 2)
+        label_surface = font.render("Show Random Walk", True, BLACK)
+        screen.blit(label_surface, (random_walk_option["rect"].x + 30, random_walk_option["rect"].y))
+        
+        
+        # Dibuja el botón de salida
+        pygame.draw.rect(screen, RED, exit_button)
+        exit_surface = font.render("Salir", True, WHITE)
+        screen.blit(exit_surface, (exit_button.x + 10, exit_button.y + 5))
+
+        pygame.display.flip()  # Actualiza la pantalla al final de cada iteración
+
+
+def random_walk_simulation():
+    # Crear una nueva ventana
+    random_walk_screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Caminata Aleatoria")
+    
+    # Definir el botón "Salir" dentro de esta función
+    exit_button = pygame.Rect(WIDTH - 100, 10, 80, 30)
+    
+    # Calcular el número de círculos basado en la densidad de partículas del material
+    max_circles = 20
+    min_circles = 5
+    material_density = MATERIALS[dropdowns["material"]["selected"]]["particle_density"]
+    max_density = max([MATERIALS[mat]["particle_density"] for mat in MATERIALS])
+    min_density = min([MATERIALS[mat]["particle_density"] for mat in MATERIALS])
+    num_circles = int(min_circles + (material_density - min_density) * (max_circles - min_circles) / (max_density - min_density))
+
+    # Crear círculos ordenados
+    circle_spacing = CYLINDER_RECT.height // (num_circles + 1)
+    circles = [Atom(CYLINDER_RECT.centerx, CYLINDER_RECT.top + i * circle_spacing) for i in range(1, num_circles + 1)]
+    
+    # Crear un electrón
+    electron = Electron(CYLINDER_RECT.left, CYLINDER_RECT.top + circle_spacing)
+    target_circle = random.choice(circles)  # Seleccionar un átomo objetivo inicialmente
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if exit_button.collidepoint(event.pos):
+                    running = False
+
+        random_walk_screen.fill(WHITE)
+        
+        # Dibujar el cilindro
+        pygame.draw.rect(random_walk_screen, LIGHT_GRAY, CYLINDER_RECT)
+
+        # Dibujar círculos
+        for circle in circles:
+            circle.draw(random_walk_screen)
+
+        # Mover el electrón de manera aleatoria entre los círculos
+        if electron.distance_to(target_circle.x, target_circle.y) < 5:  # Si está cerca del átomo objetivo
+            target_circle = random.choice(circles)  # Seleccionar un nuevo átomo objetivo
+        electron.move_towards(target_circle.x, target_circle.y)
+        electron.draw(random_walk_screen)
+
+        # Si el electrón llega al final del cilindro, reiniciar su posición
+        if electron.y >= CYLINDER_RECT.bottom:
+            electron.y = CYLINDER_RECT.top + circle_spacing
+
+        # Dibujar el botón de salida
+        pygame.draw.rect(random_walk_screen, RED, exit_button)
+        exit_surface = font.render("Salir", True, WHITE)
+        random_walk_screen.blit(exit_surface, (exit_button.x + 10, exit_button.y + 5))
+        
+        pygame.display.flip()
 
 
 def main():
@@ -171,8 +481,7 @@ def main():
                 running = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 # Check if the random walk option was clicked
-                if random_walk_option["rect"].collidepoint(event.pos):
-                    random_walk_option["checked"] = not random_walk_option["checked"]
+               
 
                 for key, box in input_boxes.items():
                     if box["rect"].collidepoint(event.pos):
@@ -210,9 +519,10 @@ def main():
                 else:
                     input_boxes[active_box]["text"] += event.unicode
             if event.type == pygame.MOUSEBUTTONDOWN and btn_rect.collidepoint(event.pos):
+                
                 start_simulation()
 
-        draw_ui()
+        
 
         draw_ui()
 

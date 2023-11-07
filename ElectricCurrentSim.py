@@ -172,9 +172,9 @@ class Electron:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.radius = 2
+        self.radius = 2.5
         self.color = BLUE
-        self.speed = 0.2  # Esta será la velocidad base para el movimiento preferencial
+        self.speed = 1  # Esta será la velocidad base para el movimiento preferencial
 
     def move(self):
         # Este método movería al electrón con una velocidad constante
@@ -183,7 +183,7 @@ class Electron:
             # Dibuja el electrón en la pantalla
             pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
 
-    def brownian_motion(self, step_size = 10):
+    def brownian_motion(self, step_size):
         # Elige una dirección aleatoria
         angle = random.uniform(0, 2 * math.pi)
         dx = step_size * math.cos(angle)
@@ -192,6 +192,7 @@ class Electron:
         # Actualiza la posición del electrón
         self.x += dx
         self.y += dy
+        self.speed = step_size -5
 
     def distance_to(self, target_x, target_y):
         # Calcula la distancia euclidiana hasta un objetivo
@@ -202,21 +203,6 @@ class Electron:
         directions = [-ELECTRON_SPEED, 0, ELECTRON_SPEED]
         self.x += random.choices(directions, weights=[1, 1, 3])[0]  # Mayor peso hacia la derecha
         self.y += random.choice(directions)
-    def set_position(self, x, y):
-        self.x = x
-        self.y = y
-
-def move_electron_to_random_circle(electron, circles):
-    # Elige un círculo destino aleatoriamente de la lista, exceptuando el círculo actual
-    current_circle_index = circles.index((electron.x, electron.y))
-    possible_next_circles = circles[current_circle_index+1:]
-    if not possible_next_circles:  # Si no hay más círculos, el electrón 'sale' del cilindro
-        return 'exit'
-    target_circle = random.choice(possible_next_circles)
-    
-    # Establece la posición del electrón a la del círculo destino
-    electron.set_position(target_circle[0], target_circle[1])
-    return 'moved'
         
 pygame.init()
 
@@ -317,8 +303,8 @@ def start_simulation():
                     if random_walk_active:
                          # Inicializa la simulación de caminata aleatoria con círculos estáticos
                         circles.clear()
-                        num_circles = 45
-                        circle_radius = 5
+                        num_circles = 20
+                        circle_radius = 8
                         horizontal_spacing = 5 * circle_radius + 5
                         vertical_spacing = 4 * circle_radius +4
 
@@ -352,32 +338,32 @@ def start_simulation():
                                 count += 1
 
         if random_walk_active:
-            # Dibuja los círculos estáticos en la pantalla
-            pygame.draw.rect(screen, LIGHT_GRAY, CYLINDER_RECT)
-            for x, y in circles:
-                if CYLINDER_RECT.inflate(-circle_radius * 2, -circle_radius * 2).collidepoint(x, y):
-                    pygame.draw.circle(screen, BLUE, (x, y), circle_radius)
+        # Dibuja los círculos estáticos en la pantalla
+                pygame.draw.rect(screen, LIGHT_GRAY, CYLINDER_RECT)
+                for x, y in circles:
+                    # Asegúrate de que el círculo esté completamente dentro del cilindro
+                    if (CYLINDER_RECT.left < x - circle_radius and
+                            CYLINDER_RECT.right > x + circle_radius and
+                            CYLINDER_RECT.top < y - circle_radius and
+                            CYLINDER_RECT.bottom > y + circle_radius):
+                        pygame.draw.circle(screen, BLUE, (x, y), circle_radius)
+                       
+                # Mueve el electrón según el movimiento Browniano
+                electron.brownian_motion(step_size=10)  # Ajusta el step_size según sea necesario
 
-            # Mueve el electrón a un círculo aleatorio
-            status = move_electron_to_random_circle(electron, circles)
+                # Verifica los límites para mantener al electrón dentro del cilindro
+                if electron.x - electron.radius < CYLINDER_RECT.left:
+                    electron.x = CYLINDER_RECT.left + electron.radius
+                elif electron.x + electron.radius > CYLINDER_RECT.right:
+                    electron.x = CYLINDER_RECT.right - electron.radius
 
-            if status == 'exit':
-                print("El electrón ha salido del cilindro.")
-                simulation_running = False  # O cualquier otra acción que desees realizar
-                continue
-            # Verifica los límites para mantener al electrón dentro del cilindro
-            if electron.x - electron.radius < CYLINDER_RECT.left:
-                electron.x = CYLINDER_RECT.left + electron.radius
-            elif electron.x + electron.radius > CYLINDER_RECT.right:
-                electron.x = CYLINDER_RECT.right - electron.radius
+                if electron.y - electron.radius < CYLINDER_RECT.top:
+                    electron.y = CYLINDER_RECT.top + electron.radius
+                elif electron.y + electron.radius > CYLINDER_RECT.bottom:
+                    electron.y = CYLINDER_RECT.bottom - electron.radius
 
-            if electron.y - electron.radius < CYLINDER_RECT.top:
-                electron.y = CYLINDER_RECT.top + electron.radius
-            elif electron.y + electron.radius > CYLINDER_RECT.bottom:
-                electron.y = CYLINDER_RECT.bottom - electron.radius
-
-            # Dibuja el electrón
-            electron.draw(screen)
+                # Dibuja el electrón
+                electron.draw(screen)
         else:
             # Aquí irá la lógica de la simulación y la visualización de los electrones
 

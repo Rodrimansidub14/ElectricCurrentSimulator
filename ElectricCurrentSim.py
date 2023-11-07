@@ -12,11 +12,11 @@ WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.DOUBLEBUF) # Added DOUBLEBUF for double buffering
 pygame.display.set_caption("Electrical Conduction Simulation")
 MATERIALS = {
-    "Gold": {"resistivity": 2.44e-8, "particle_density": 5.9e28},
-    "Silver": {"resistivity": 1.59e-8, "particle_density": 5.86e28},
-    "Copper": {"resistivity": 1.68e-8, "particle_density": 8.5e28},
-    "Aluminum": {"resistivity": 2.82e-8, "particle_density": 6.02e28},
-    "Graphite": {"resistivity": 7.837e-5, "particle_density": 2.2e23}
+    "Oro": {"resistivity": 2.44e-8, "particle_density": 5.9e28},
+    "Plata": {"resistivity": 1.59e-8, "particle_density": 5.86e28},
+    "Cobre": {"resistivity": 1.68e-8, "particle_density": 8.5e28},
+    "Aluminio": {"resistivity": 2.82e-8, "particle_density": 6.02e28},
+    "Grafito": {"resistivity": 7.837e-5, "particle_density": 2.2e23}
 }
 btn_rect = pygame.Rect(WIDTH // 2 - 100, 300, 200, 50)
 # Colors
@@ -35,7 +35,7 @@ font = pygame.font.Font(None, 28)
 CYLINDER_RECT = pygame.Rect(WIDTH // 4, HEIGHT - 345, WIDTH // 2, 100)
 
 # Random walk option
-random_walk_option = {"rect": pygame.Rect(WIDTH // 4, HEIGHT - 85, 20, 20), "checked": False, "label": "Show Random Walk"}
+random_walk_option = {"rect": pygame.Rect(WIDTH // 4, HEIGHT - 85, 20, 20), "checked": False, "label": "Mostrar caminata aleatoria"}
 # AWG to mm conversion (assuming some values for simplicity)
 def awg_to_mm(awg):
     if awg == "0000":
@@ -50,25 +50,25 @@ def awg_to_mm(awg):
 
 # Particle density for materials (assuming some values for simplicity)
 MATERIAL_DENSITY = {
-    "Gold": "1.0 x 10^28",
-    "Silver": "1.1 x 10^28",
-    "Copper": "1.2 x 10^28",
-    "Aluminum": "1.3 x 10^28",
-    "Graphite": "1.4 x 10^28"
+    "Oro": "5.901 x 10^28",  # atoms per cubic meter
+    "Plata": "5.856 x 10^28",  # atoms per cubic meter
+    "Cobre": "8.491 x 10^28",  # atoms per cubic meter
+    "Aluminio": "6.026 x 10^28",  # atoms per cubic meter
+    "Grafito": "1.083 x 10^29" # atoms per cubic meter
 }
 
 # Input boxes
 input_boxes = {
-    "length": {"rect": pygame.Rect(180, 100, 195, 40), "text": "", "label": "Length (m):", "active": True},
-    "diameter_mm": {"rect": pygame.Rect(180, 200, 195, 40), "text": "", "label": "Diameter (mm):", "active": True},
-    "voltage": {"rect": pygame.Rect(180, 250, 195, 40), "text": "", "label": "Voltage (V):", "active": True},
-    "awg": {"rect": pygame.Rect(530, 150, 195, 40), "text": "", "label": "AWG (000-40):", "active": False}
+    "length": {"rect": pygame.Rect(180, 100, 195, 40), "text": "", "label": "Longitud (m):", "active": True},
+    "diameter_mm": {"rect": pygame.Rect(180, 200, 195, 40), "text": "", "label": "Diametro (mm):", "active": True},
+    "voltage": {"rect": pygame.Rect(180, 250, 195, 40), "text": "", "label": "Voltaje (V):", "active": True},
+    "awg": {"rect": pygame.Rect(530, 150, 195, 40), "text": "", "label": "Calibre(000-40):", "active": False}
 }
 
 # Dropdown menus
 dropdowns = {
-    "diameter_unit": {"rect": pygame.Rect(180, 150, 195, 40), "options": ["mm", "AWG"], "selected": "mm", "label": "Unit:"},
-    "material": {"rect": pygame.Rect(530, 100, 200, 40), "options": ["Gold", "Silver", "Copper", "Aluminum", "Graphite"], "selected": None, "label": "Material:"}
+    "diameter_unit": {"rect": pygame.Rect(180, 150, 195, 40), "options": ["mm", "AWG"], "selected": "mm", "label": "Unidad:"},
+    "material": {"rect": pygame.Rect(530, 100, 200, 40), "options": ["Oro", "Plata", "Cobre", "Aluminio", "Grafito"], "selected": None, "label": "Material:"}
 }
 
 active_box = None
@@ -120,7 +120,7 @@ def draw_ui():
         # Draw particle density for selected material
     material = dropdowns["material"]["selected"]
     if material:
-        density_text = f"Particle Density ({material}): {MATERIAL_DENSITY[material]}"
+        density_text = f"Densidad de Particula ({material}): {MATERIAL_DENSITY[material]} en atomo/m^3"
         density_surface = font.render(density_text, True, BLACK)
         screen.blit(density_surface, (WIDTH // 2 - density_surface.get_width() // 2, 530))
         awg_value = input_boxes["awg"]["text"]
@@ -192,7 +192,7 @@ class Electron:
         # Actualiza la posición del electrón
         self.x += dx
         self.y += dy
-        self.speed = step_size -5
+        self.speed = step_size  
 
     def distance_to(self, target_x, target_y):
         # Calcula la distancia euclidiana hasta un objetivo

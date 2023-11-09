@@ -1,5 +1,8 @@
 # Simulador de modelo de conducción eléctrica
-# Simulador de Conductividad Eléctrica
+### Rodrigo Mansilla 22611
+### Física 3 
+### Parcial 3, Programa
+### Ciclo 2 Año 2
 
 Este simulador calcula varias propiedades eléctricas de un conductor, como la resistencia, la corriente, la potencia, la velocidad de arrastre y el tiempo de viaje de un electrón, basándose en las dimensiones físicas y el material del conductor.
 

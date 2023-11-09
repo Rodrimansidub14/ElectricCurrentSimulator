@@ -25,4 +25,4 @@ Este simulador calcula varias propiedades eléctricas de un conductor, como la r
 
 ## Enlace al video
 
-[Video]([URL_DEL_SIMULADOR](https://youtu.be/FpEIUSz_FUE)https://youtu.be/FpEIUSz_FUE)
+[Video](https://youtu.be/FpEIUSz_FUE)

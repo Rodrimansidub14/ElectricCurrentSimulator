@@ -152,7 +152,7 @@ def draw_ui():
     btn_rect = pygame.Rect(WIDTH // 2 - 100, 300, 200, 50)
     btn_color = BLUE if not hovering_button else (50, 150, 255)
     pygame.draw.rect(screen, btn_color, btn_rect)
-    btn_surface = font.render("Start Simulation", True, WHITE)
+    btn_surface = font.render("Comenzar Simulación", True, WHITE)
     screen.blit(btn_surface, (btn_rect.x + 10, btn_rect.y + 10))
 
     if error_message:
